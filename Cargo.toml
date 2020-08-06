@@ -13,6 +13,3 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 embedded-hal = { version = "0.2.4", features = ["unproven"] }
-
-[features]
-doc = []

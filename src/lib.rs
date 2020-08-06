@@ -6,9 +6,9 @@
 #![feature(unsize)]
 #![no_std]
 
-extern crate embedded_hal as hal;
+use embedded_hal as hal;
 
-use hal::digital::{InputPin, OutputPin};
+use hal::digital::v2::{InputPin, OutputPin};
 use hal::spi::{Mode, Phase, Polarity};
 use hal::blocking::spi;
 
@@ -35,7 +35,7 @@ pub enum SensorType {
     ThreeWire = 1,
 }
 
-pub struct Max31865<SPI, NCS, RDY> {
+pub struct Max31865<NCS, RDY> {
     // spi: SPI,
     ncs: NCS,
     rdy: RDY,
@@ -43,11 +43,11 @@ pub struct Max31865<SPI, NCS, RDY> {
 }
 
 
-impl<E, SPI, NCS, RDY> Max31865<SPI, NCS, RDY>
+impl<NCS, RDY> Max31865<NCS, RDY>
 where 
-    SPI: spi::Write<u8, Error = E> + spi::Transfer<u8, Error = E>,
+    // SPI: spi::Write<u8, Error = E> + spi::Transfer<u8, Error = E>,
     NCS: OutputPin,
-    RDY: InputPin
+    RDY: InputPin,
 {
     /// Create a new MAX31865 module.
     /// 
@@ -58,11 +58,11 @@ where
     /// * `rdy` - The ready pin which is set low by the MAX31865 controller whenever
     ///             it has finished converting the output.
     /// 
-    pub fn new(
+    pub fn new<E>(
         // spi: SPI,
         mut ncs: NCS,
         rdy: RDY,
-    ) -> Result<Max31865<SPI, NCS, RDY>, E>
+    ) -> Result<Max31865<NCS, RDY>, E>
     {
         let default_calib = 40000;
 
@@ -93,15 +93,16 @@ where
     /// 
     /// *Note*: The correct sensor configuration also requires changes to the PCB! Make sure to read the datasheet 
     /// concerning this.
-    pub fn configure(&mut self, vbias: bool, conversion_mode: bool, one_shot: bool,
-        sensor_type: SensorType, filter_mode: FilterMode) -> Result<(), E> {
+    pub fn configure<SPI, E>(&mut self, spi: &mut SPI, vbias: bool, conversion_mode: bool, one_shot: bool,
+        sensor_type: SensorType, filter_mode: FilterMode) -> Result<(), E> 
+        where SPI: spi::Write<u8, Error = E> + spi::Transfer<u8, Error = E>,{
         let conf : u8 = ((vbias as u8) << 7) |
             ((conversion_mode as u8) << 6) |
             ((one_shot as u8) << 5) |
             ((sensor_type as u8) << 4) | 
             (filter_mode as u8);
 
-        self.write(Register::CONFIG, conf)?;
+        self.write(spi, Register::CONFIG, conf)?;
 
         Ok(())
     }
@@ -120,7 +121,7 @@ where
     /// You can perform calibration by putting the sensor in boiling (100 degrees 
     /// Celcius) water and then measuring the raw value using `read_raw`. Calculate 
     /// `calib` as `(13851 << 15) / raw >> 1`.
-    pub fn set_calibration(&mut self, calib : u32) -> Result<(), E> {
+    pub fn set_calibration<E>(&mut self, calib : u32) -> Result<(), E> {
         self.calibration = calib;
         Ok(())
     }
@@ -130,8 +131,9 @@ where
     /// # Remarks
     /// 
     /// The output value is the value in degrees Celcius multiplied by 100.
-    pub fn read_default_conversion(&mut self) -> Result<u32, E> {
-        let raw = self.read_raw()?;
+    pub fn read_default_conversion<SPI, E>(&mut self, spi: &mut SPI) -> Result<u32, E> 
+    where SPI: spi::Write<u8, Error = E> + spi::Transfer<u8, Error = E>,{
+        let raw = self.read_raw(spi)?;
         let ohms = ((raw >> 1) as u32 * self.calibration) >> 15;
         let temp = temp_conversion::lookup_temperature(ohms as u16);
 
@@ -147,9 +149,10 @@ where
     /// resistor (i.e. 2^15 - 1 would be the exact same resistance as the reference
     /// resistor). See manual for further information.
     /// The last bit specifies if the conversion was successful. 
-    pub fn read_raw(&mut self) -> Result<u16, E> {
-        let msb : u16 = self.read(Register::RTD_MSB)? as u16;
-        let lsb : u16 = self.read(Register::RTD_LSB)? as u16;
+    pub fn read_raw<SPI, E>(&mut self, spi: &mut SPI) -> Result<u16, E> 
+    where SPI: spi::Write<u8, Error = E> + spi::Transfer<u8, Error = E>,{
+        let msb : u16 = self.read(spi, Register::RTD_MSB)? as u16;
+        let lsb : u16 = self.read(spi, Register::RTD_LSB)? as u16;
         
         Ok((msb << 8) | lsb)
     }
@@ -161,17 +164,22 @@ where
     /// When the module is finished converting the temperature it sets the 
     /// ready pin to low. It is automatically returned to high upon reading the 
     /// RTD registers.
-    pub fn is_ready(&self) -> Result<bool, E> {
-        Ok(self.rdy.is_low())
+    // pub fn is_ready<E>(&self) -> Result<bool, E> {
+    //     self.rdy.is_low()
+    // }
+    pub fn is_ready<E>(&self) -> bool {
+        self.rdy.is_low().unwrap_or(false)
     }
 
-    fn read(&mut self, reg: Register) -> Result<u8, E> {
-        let buffer: [u8; 2] = self.read_many(reg)?;
+    fn read<SPI, E>(&mut self, spi: &mut SPI, reg: Register) -> Result<u8, E> 
+    where SPI: spi::Write<u8, Error = E> + spi::Transfer<u8, Error = E>,{
+        let buffer: [u8; 2] = self.read_many(spi, reg)?;
         Ok(buffer[1])
     }
 
-    fn read_many<B>(&mut self, &mut spi: &mut SPI, reg: Register) -> Result<B, E> 
+    fn read_many<B, SPI, E>(&mut self, &mut spi: &mut SPI, reg: Register) -> Result<B, E> 
     where B: Unsize<[u8]>,
+    SPI: spi::Write<u8, Error = E> + spi::Transfer<u8, Error = E>,
     {
         let mut buffer: B  = unsafe { mem::zeroed() };
         {
@@ -185,7 +193,9 @@ where
         Ok(buffer)
     }
 
-    fn write(&mut self, spi: &mut SPI, reg: Register, val: u8) -> Result<(), E> {
+    fn write<SPI, E>(&mut self, spi: &mut SPI, reg: Register, val: u8) -> Result<(), E> 
+    where SPI: spi::Write<u8, Error = E> + spi::Transfer<u8, Error = E>,
+    {
         self.ncs.set_low();
         spi.write(&[reg.write_address(), val])?;
         self.ncs.set_high();
