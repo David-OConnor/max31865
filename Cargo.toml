@@ -2,6 +2,7 @@
 name = "max31865"
 version = "0.1.0"
 authors = ["Rudi Horn <dyn-git@rudi-horn.de>"]
+edition = "2018"
 keywords = ["embedded-hal-crate", "rtd-sensor"]
 categories = ["embedded", "no-std", "hardware-support"]
 description = "generic driver for the MAX31865 RTD to Digital converter"
@@ -11,7 +12,7 @@ readme = "README.md"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-embedded-hal = { version = "0.1.2", features = ["unproven"] }
+embedded-hal = { version = "0.2.4", features = ["unproven"] }
 
 [features]
 doc = []

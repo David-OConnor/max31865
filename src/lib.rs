@@ -36,7 +36,7 @@ pub enum SensorType {
 }
 
 pub struct Max31865<SPI, NCS, RDY> {
-    spi: SPI,
+    // spi: SPI,
     ncs: NCS,
     rdy: RDY,
     calibration: u32,
@@ -59,7 +59,7 @@ where
     ///             it has finished converting the output.
     /// 
     pub fn new(
-        spi: SPI,
+        // spi: SPI,
         mut ncs: NCS,
         rdy: RDY,
     ) -> Result<Max31865<SPI, NCS, RDY>, E>
@@ -68,7 +68,7 @@ where
 
         ncs.set_high();
         let max31865 = Max31865 {
-            spi,
+            // spi,
             ncs,
             rdy,
             calibration: default_calib, /* value in ohms multiplied by 100 */
@@ -170,7 +170,7 @@ where
         Ok(buffer[1])
     }
 
-    fn read_many<B>(&mut self, reg: Register) -> Result<B, E> 
+    fn read_many<B>(&mut self, &mut spi: &mut SPI, reg: Register) -> Result<B, E> 
     where B: Unsize<[u8]>,
     {
         let mut buffer: B  = unsafe { mem::zeroed() };
@@ -178,16 +178,16 @@ where
             let slice: &mut [u8] = &mut buffer;
             slice[0] = reg.read_address();
             self.ncs.set_low();
-            self.spi.transfer(slice)?;
+            spi.transfer(slice)?;
             self.ncs.set_high();
         }
 
         Ok(buffer)
     }
 
-    fn write(&mut self, reg: Register, val: u8) -> Result<(), E> {
+    fn write(&mut self, spi: &mut SPI, reg: Register, val: u8) -> Result<(), E> {
         self.ncs.set_low();
-        self.spi.write(&[reg.write_address(), val])?;
+        spi.write(&[reg.write_address(), val])?;
         self.ncs.set_high();
         Ok(())
     }
