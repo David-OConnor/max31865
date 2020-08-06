@@ -177,7 +177,7 @@ where
         Ok(buffer[1])
     }
 
-    fn read_many<B, SPI, E>(&mut self, &mut spi: &mut SPI, reg: Register) -> Result<B, E> 
+    fn read_many<B, SPI, E>(&mut self, spi: &mut SPI, reg: Register) -> Result<B, E> 
     where B: Unsize<[u8]>,
     SPI: spi::Write<u8, Error = E> + spi::Transfer<u8, Error = E>,
     {
