@@ -64,7 +64,7 @@ where
     ) -> Result<Max31865<NCS, RDY>, E> {
         let default_calib = 40000;
 
-        ncs.set_high();
+        ncs.set_high().ok();
         let max31865 = Max31865 {
             // spi,
             ncs,
@@ -199,9 +199,9 @@ where
         {
             let slice: &mut [u8] = &mut buffer;
             slice[0] = reg.read_address();
-            self.ncs.set_low();
+            self.ncs.set_low().ok();
             spi.transfer(slice)?;
-            self.ncs.set_high();
+            self.ncs.set_high().ok();
         }
 
         Ok(buffer)
@@ -211,9 +211,9 @@ where
     where
         SPI: spi::Write<u8, Error = E> + spi::Transfer<u8, Error = E>,
     {
-        self.ncs.set_low();
+        self.ncs.set_low().ok();
         spi.write(&[reg.write_address(), val])?;
-        self.ncs.set_high();
+        self.ncs.set_high().ok();
         Ok(())
     }
 }
