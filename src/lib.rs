@@ -38,7 +38,7 @@ pub enum SensorType {
 pub struct Max31865<NCS, RDY> {
     // spi: SPI,
     ncs: NCS,
-    rdy: RDY,
+    rdy: Option<RDY>,
     calibration: u32,
 }
 
@@ -60,7 +60,7 @@ where
     pub fn new<E>(
         // spi: SPI,
         mut ncs: NCS,
-        rdy: RDY,
+        rdy: Option<RDY>,
     ) -> Result<Max31865<NCS, RDY>, E> {
         let default_calib = 40000;
 
@@ -179,7 +179,10 @@ where
     //     self.rdy.is_low()
     // }
     pub fn is_ready<E>(&self) -> bool {
-        self.rdy.is_low().unwrap_or(false)
+        match &self.rdy {
+            Some(rdy) => rdy.is_low().unwrap_or(false),
+            None => true,
+        }        
     }
 
     fn read<SPI, E>(&mut self, spi: &mut SPI, reg: Register) -> Result<u8, E>
